@@ -1,0 +1,5 @@
+classique nmap:
+
+sudo nmap -p22,80 -sC -sV --version-light -T4 IP
+
+sudo nmap -p- -Pn IP
