@@ -1,14 +1,11 @@
 # Bibliothèque de requêtes SPL pour la détection et le threat hunting
 
-
-Bibliothèque personnelle de requêtes SPL pour la détection et le threat hunting, organisée par technique d'attaque et alignée sur MITRE ATT&CK. Les index, sourcetypes et seuils sont à adapter au contexte de chaque environnement.
-
-**Conventions de cette bibliothèque**
-- Index : `main` est utilisé par défaut dans les exemples. À adapter au contexte réel.
-- Sourcetypes : `WinEventLog:Security` (live UF) ou `XmlWinEventLog:Microsoft-Windows-Sysmon/Operational` (Sysmon Olaf Hartong / TA-microsoft-sysmon).
-- Comptes machine : toujours filtrer `user!=*$` ou `Account_Name!=*$`.
-- IPv6-mappées IPv4 : nettoyer avec `rex field=src_ip "(\:\:ffff\:)?(?<src_ip>[0-9\.]+)"`.
-
+> Bibliothèque personnelle de requêtes SPL pour la détection et le threat hunting, organisée par technique d'attaque et alignée sur MITRE ATT&CK. Les index, sourcetypes et seuils sont à adapter au contexte de chaque environnement.
+> **Conventions de cette bibliothèque**
+> - Index : `main` est utilisé par défaut dans les exemples. À adapter au contexte réel.
+> - Sourcetypes : `WinEventLog:Security` (live UF) ou `XmlWinEventLog:Microsoft-Windows-Sysmon/Operational` (Sysmon Olaf Hartong / TA-microsoft-sysmon).
+> - Comptes machine : toujours filtrer `user!=*$` ou `Account_Name!=*$`.
+> - IPv6-mappées IPv4 : nettoyer avec `rex field=src_ip "(\:\:ffff\:)?(?<src_ip>[0-9\.]+)"`.
 
 ---
 
@@ -34,6 +31,8 @@ Bibliothèque personnelle de requêtes SPL pour la détection et le threat hunti
 
 ## 1.1 Failed logons - brute force / password spraying (par IP source)
 
+**MITRE ATT&CK** : T1110.003, T1110.001
+
 **Contexte** : détecter une IP source qui tente beaucoup de comptes différents (signe spraying) ou un compte qui voit beaucoup d'échecs (brute force).
 **Source de logs requise** : Windows Security log
 **Index typique** : `main`
@@ -54,6 +53,8 @@ index=main source="WinEventLog:Security" EventCode=4625
 
 ## 1.2 Brute force - connexions rapprochées sur un même compte
 
+**MITRE ATT&CK** : T1110.001
+
 **Contexte** : détecter beaucoup d'échecs sur le même compte sur une fenêtre courte.
 **Source de logs requise** : Windows Security log
 **Index typique** : `main`
@@ -73,6 +74,8 @@ EventCode=4625
 
 ## 1.3 Brute force RDP via Zeek
 
+**MITRE ATT&CK** : T1110.001
+
 **Contexte** : RDP brute force détecté côté NSM (Zeek) - utile quand pas de visibilité 4625 sur les cibles.
 **Source de logs requise** : Zeek RDP log
 **Index typique** : `rdp_bruteforce`
@@ -90,6 +93,8 @@ index="rdp_bruteforce" sourcetype="bro:rdp:json"
 
 ## 1.4 Brute force SSH via Zeek
 
+**MITRE ATT&CK** : T1110.001
+
 **Contexte** : SSH brute force détecté côté Zeek.
 **Source de logs requise** : Zeek SSH log
 **Index typique** : `ssh_bruteforce`
@@ -106,6 +111,8 @@ index="ssh_bruteforce" sourcetype="bro:ssh:json" auth_success="false"
 ---
 
 ## 1.5 Brute force / user enum Kerberos via Zeek
+
+**MITRE ATT&CK** : T1110.003, T1087
 
 **Contexte** : énumération de comptes via AS-REQ vers DC. `KDC_ERR_PREAUTH_REQUIRED` est exclu (= comportement normal d'un client cherchant un user valide).
 **Source de logs requise** : Zeek Kerberos log
@@ -125,6 +132,8 @@ error_msg!=KDC_ERR_PREAUTH_REQUIRED success="false" request_type=AS
 
 ## 1.6 Pre-auth failures Kerberos (4771) - équivalent côté DC
 
+**MITRE ATT&CK** : T1110.001
+
 **Contexte** : détecter brute force Kerberos via le log natif Windows du DC (alternative à Zeek).
 **Source de logs requise** : Windows Security log (DC)
 **Index typique** : `main`
@@ -143,6 +152,8 @@ index=main source="WinEventLog:Security" EventCode=4771
 
 ## 1.7 Account lockouts (4740)
 
+**MITRE ATT&CK** : T1110
+
 Pattern type :
 
 ```spl
@@ -154,6 +165,8 @@ index=main source="WinEventLog:Security" EventCode=4740
 ---
 
 ## 1.8 Logons hors heures ouvrées
+
+**MITRE ATT&CK** : T1078
 
 Pattern type :
 
@@ -169,6 +182,8 @@ index=main source="WinEventLog:Security" EventCode=4624 user!=*$
 ---
 
 ## 1.9 Privilèges spéciaux assignés à une nouvelle session (4672)
+
+**MITRE ATT&CK** : T1078
 
 **Contexte** : apparition récente de droits admin sur un compte (signal Silver Ticket / nouvel admin).
 **Source de logs requise** : Windows Security log
@@ -188,6 +203,8 @@ index=main EventCode=4672
 
 ## 1.10 Logon explicite (4648) - runas / mouvement latéral
 
+**MITRE ATT&CK** : T1078, T1021
+
 **Contexte** : événement émis pour `runas` ou connexion explicite avec credentials différents (signal Responder, mouvement latéral, pivot Kerberoasting).
 **Source de logs requise** : Windows Security log
 **Index typique** : `main`
@@ -206,6 +223,8 @@ index=main EventCode=4648
 
 ## 2.1 Kerberoasting - recon LDAP via SilkService
 
+**MITRE ATT&CK** : T1558.003
+
 **Contexte** : détecter la phase de recon (recherche LDAP de comptes avec SPN) - antérieure aux 4769 RC4.
 **Source de logs requise** : SilkService log custom (ETW LDAP-Client)
 **Index typique** : `main`
@@ -223,6 +242,8 @@ index=main source="WinEventLog:SilkService-Log"
 ---
 
 ## 2.2 Kerberoasting - TGS sans logon explicite suivant (méthode `stats`)
+
+**MITRE ATT&CK** : T1558.003
 
 **Contexte** : un TGS pour un service sans 4648 dans la fenêtre suivante = pas d'accès légitime au service après le ticket → roasting probable.
 **Source de logs requise** : Windows Security log
@@ -245,6 +266,8 @@ index=main EventCode=4648 OR (EventCode=4769 AND service_name=iis_svc)
 
 ## 2.3 Kerberoasting - variante `transaction`
 
+**MITRE ATT&CK** : T1558.003
+
 **Contexte** : version élégante mais coûteuse de la requête précédente. Préférer 2.2 en prod.
 **Source de logs requise** : Windows Security log
 **Index typique** : `main`
@@ -263,6 +286,8 @@ index=main EventCode=4648 OR (EventCode=4769 AND service_name=iis_svc)
 
 ## 2.4 Kerberoasting - RC4 forcé (Zeek)
 
+**MITRE ATT&CK** : T1558.003
+
 **Contexte** : détection comportementale via `cipher=rc4-hmac` + `forwardable=true` + `renewable=true`.
 **Source de logs requise** : Zeek Kerberos log
 **Index typique** : `sharphound`
@@ -280,6 +305,8 @@ forwardable="true" renewable="true"
 
 ## 2.5 AS-REPRoasting - recon LDAP via SilkService
 
+**MITRE ATT&CK** : T1558.004
+
 **Contexte** : recon LDAP des comptes avec `DONT_REQUIRE_PREAUTH` (bit `4194304`).
 **Source de logs requise** : SilkService log
 **Index typique** : `main`
@@ -295,6 +322,8 @@ index=main source="WinEventLog:SilkService-Log"
 ---
 
 ## 2.6 AS-REPRoasting - 4768 avec Pre_Authentication_Type=0
+
+**MITRE ATT&CK** : T1558.004
 
 **Contexte** : la signature serveur côté DC.
 **Source de logs requise** : Windows Security log
@@ -312,6 +341,8 @@ index=main source="WinEventLog:Security" EventCode=4768 Pre_Authentication_Type=
 
 ## 2.7 Pass-the-Hash - détection simple (LogonType 9 + seclogo)
 
+**MITRE ATT&CK** : T1550.002
+
 **Contexte** : détection minimale, génère des faux positifs sur `runas /netonly` légitime → préférer 2.8.
 **Source de logs requise** : Windows Security log
 **Index typique** : `main`
@@ -324,6 +355,8 @@ index=main source="WinEventLog:Security" EventCode=4624 Logon_Type=9 Logon_Proce
 ---
 
 ## 2.8 Pass-the-Hash - détection renforcée (LogonType 9 + accès LSASS)
+
+**MITRE ATT&CK** : T1550.002, T1003.001
 
 **Contexte** : élimine les `runas /netonly` légitimes en exigeant un accès LSASS (Sysmon EID 10) dans la même minute.
 **Source de logs requise** : Windows Security log + Sysmon
@@ -342,6 +375,8 @@ index=main (source="XmlWinEventLog:Microsoft-Windows-Sysmon/Operational" EventCo
 ---
 
 ## 2.9 Pass-the-Ticket / Golden Ticket - TGS sans TGT préalable
+
+**MITRE ATT&CK** : T1550.003, T1558.001
 
 **Contexte** : un TGS (4769) sans 4768 préalable dans la fenêtre = ticket forgé/volé injecté.
 **Source de logs requise** : Windows Security log
@@ -363,6 +398,8 @@ index=main source="WinEventLog:Security" user!=*$ EventCode IN (4768,4769,4770)
 
 ## 2.10 Golden Ticket - anomalie comportementale (Zeek)
 
+**MITRE ATT&CK** : T1558.001
+
 **Contexte** : source qui ne fait que TGS, jamais AS-REQ → anomalie absolue.
 **Source de logs requise** : Zeek Kerberos log
 **Index typique** : `golden_ticket_attack`
@@ -378,6 +415,8 @@ index="golden_ticket_attack" sourcetype="bro:kerberos:json"
 ---
 
 ## 2.11 Silver Ticket - users inconnus connectés (corrélation users.csv)
+
+**MITRE ATT&CK** : T1558.002
 
 **Contexte** : workflow en 2 étapes - bâtir la liste de référence des users légitimes, puis chercher les logons hors liste.
 **Source de logs requise** : Windows Security log
@@ -407,6 +446,8 @@ index=main EventCode=4624
 
 ## 2.12 Silver Ticket - pivot pour identifier le service compromis
 
+**MITRE ATT&CK** : T1558.002
+
 **Contexte** : une fois un user inconnu identifié sur un host, identifier quel compte de service a été compromis.
 **Source de logs requise** : Windows Security log
 **Index typique** : `main`
@@ -422,6 +463,8 @@ index=main "<username_inconnu>" "<HOSTNAME>"
 
 ## 2.13 DCSync - détection minimale (Access_Mask 0x100)
 
+**MITRE ATT&CK** : T1003.006
+
 **Contexte** : 4662 sur DS avec accès "Replicating Directory Changes" + non-compte machine.
 **Source de logs requise** : Windows Security log (audit DS Access activé)
 **Index typique** : `main`
@@ -433,6 +476,8 @@ index=main EventCode=4662 Access_Mask=0x100 Account_Name!=*$
 ---
 
 ## 2.14 DCSync - détection détaillée (avec parsing du Message)
+
+**MITRE ATT&CK** : T1003.006
 
 **Contexte** : extraire le détail "Replicating Directory Changes" depuis le Message.
 **Source de logs requise** : Windows Security log
@@ -450,6 +495,8 @@ index=main EventCode=4662 Message="*Replicating Directory Changes*"
 
 ## 2.15 DCShadow - ajout de SPN Global Catalog (4742)
 
+**MITRE ATT&CK** : T1207
+
 **Contexte** : ajout d'un SPN `XX/MACHINE.corp.local` (global catalog) à un compte machine = enregistrement comme faux DC.
 **Source de logs requise** : Windows Security log
 **Index typique** : `main`
@@ -466,6 +513,8 @@ index=main EventCode=4742
 ---
 
 ## 2.16 Constrained Delegation - recon PowerShell (4104)
+
+**MITRE ATT&CK** : T1558
 
 **Contexte** : EID 4104 PowerShell révèle les recherches sur attribut de délégation.
 **Source de logs requise** : PowerShell Operational
@@ -485,6 +534,8 @@ index=main source="WinEventLog:Microsoft-Windows-PowerShell/Operational" EventCo
 
 ## 2.17 Constrained Delegation - connexion Rubeus port 88 (Sysmon)
 
+**MITRE ATT&CK** : T1558
+
 **Contexte** : détection comportementale de Rubeus s4u via Sysmon EID 3 vers DC port 88 depuis process ≠ lsass.exe.
 **Source de logs requise** : Sysmon
 **Index typique** : `main`
@@ -499,6 +550,8 @@ index=main source="XmlWinEventLog:Microsoft-Windows-Sysmon/Operational"
 ---
 
 ## 2.18 Overpass-the-Hash - connexion Kerberos depuis process inhabituel
+
+**MITRE ATT&CK** : T1550.002
 
 **Contexte** : Mimikatz overpass se détecte comme PtH (cf. 2.8) ; Rubeus génère 4768 légitime → utiliser Sysmon EID 3 port 88 depuis process ≠ lsass.exe.
 **Source de logs requise** : Sysmon (process create + network)
@@ -518,6 +571,8 @@ index=main source="XmlWinEventLog:Microsoft-Windows-Sysmon/Operational" (EventCo
 
 ## 2.20 Password spraying - Kerberos (codes erreurs 4768)
 
+**MITRE ATT&CK** : T1110.003
+
 ```spl
 index=main source="WinEventLog:Security" EventCode=4768 (Result_Code=0x6 OR Result_Code=0x12)
 | bin span=15m _time
@@ -528,6 +583,8 @@ index=main source="WinEventLog:Security" EventCode=4768 (Result_Code=0x6 OR Resu
 ---
 
 ## 2.21 Password spraying - NTLM (4776)
+
+**MITRE ATT&CK** : T1110.003
 
 ```spl
 index=main source="WinEventLog:Security" EventCode=4776 Status="0xC0000064"
@@ -541,6 +598,8 @@ index=main source="WinEventLog:Security" EventCode=4776 Status="0xC0000064"
 ---
 
 ## 2.22 Recon AD natif - multi-commands depuis même parent (Sysmon EID 1)
+
+**MITRE ATT&CK** : T1087.002, T1059
 
 **Contexte** : un même parent qui lance plus de 3 commandes de recon (whoami/net/nltest/ipconfig...) = signal fort de recon manuelle / scripts d'attaquant.
 **Source de logs requise** : Sysmon
@@ -558,6 +617,8 @@ index=main source="XmlWinEventLog:Microsoft-Windows-Sysmon/Operational" EventID=
 ---
 
 ## 2.23 BloodHound / SharpHound - LDAP via SilkService
+
+**MITRE ATT&CK** : T1087.002
 
 **Contexte** : SharpHound bombarde le DC de LDAP. Filtre `samAccountType=805306368` = listage users.
 **Source de logs requise** : SilkService log custom
@@ -586,6 +647,8 @@ index=main EventCode=1 ProcessId=<PID>
 
 ## 2.24 BloodHound via RPC (alternative LDAP)
 
+**MITRE ATT&CK** : T1087.002
+
 **Contexte** : BloodHound peut utiliser des appels DCE/RPC plutôt que LDAP - détection via Zeek `dce_rpc.log`.
 **Source de logs requise** : Zeek DCE/RPC
 **Index typique** : `bloodhound_all_no_kerberos_sign`
@@ -599,6 +662,8 @@ operation IN ("NetrSessionEnum", "NetrWkstaUserEnum", "SamrGetMembersInAlias", "
 ---
 
 ## 2.25 Zerologon (CVE-2020-1472) - flood Netlogon RPC
+
+**MITRE ATT&CK** : T1210
 
 **Contexte** : >100 reqs/min sur endpoint `netlogon` avec ≥2 opérations distinctes.
 **Source de logs requise** : Zeek DCE/RPC
@@ -616,6 +681,8 @@ index="zerologon" endpoint="netlogon" sourcetype="bro:dce_rpc:json"
 
 ## 2.26 PrintNightmare - RpcAddPrinterDriverEx via spoolss
 
+**MITRE ATT&CK** : T1068
+
 **Source de logs requise** : Zeek DCE/RPC
 **Index typique** : `printnightmare`
 
@@ -630,6 +697,8 @@ endpoint=spoolss operation=RpcAddPrinterDriverEx
 # 3. Process Creation & Execution
 
 ## 3.1 Process create - vue parent → enfant (Sysmon EID 1)
+
+**MITRE ATT&CK** : T1059
 
 **Contexte** : top des relations parent-enfant pour identifier les chaînes anormales.
 **Source de logs requise** : Sysmon
@@ -652,6 +721,8 @@ index="main" sourcetype="WinEventLog:Sysmon" EventCode=1
 
 ## 3.3 Process creation 4688
 
+**MITRE ATT&CK** : T1059
+
 ```spl
 index=main source="WinEventLog:Security" EventCode=4688
 | stats count by NewProcessName, ParentProcessName, host
@@ -661,6 +732,8 @@ index=main source="WinEventLog:Security" EventCode=4688
 ---
 
 ## 3.4 Suspicious parent-child relationships
+
+**MITRE ATT&CK** : T1059
 
 Pattern type :
 
@@ -675,6 +748,8 @@ Image IN ("*\\cmd.exe","*\\powershell.exe","*\\wscript.exe","*\\cscript.exe","*\
 
 ## 3.5 LOLBins - exécution depuis un parent inhabituel
 
+**MITRE ATT&CK** : T1218
+
 Pattern type :
 
 ```spl
@@ -687,6 +762,8 @@ Image IN ("*\\msbuild.exe","*\\installutil.exe","*\\regsvr32.exe","*\\rundll32.e
 ---
 
 ## 3.6 PowerShell - recherche dans le contenu des scripts (4104)
+
+**MITRE ATT&CK** : T1059.001
 
 **Contexte** : Script Block Logging logue le **contenu** des scripts PowerShell.
 **Source de logs requise** : PowerShell Operational
@@ -702,6 +779,8 @@ index=main source="WinEventLog:Microsoft-Windows-PowerShell/Operational" EventCo
 ---
 
 ## 3.7 PowerShell encodé (CommandLine > 1000 chars)
+
+**MITRE ATT&CK** : T1059.001, T1027
 
 **Contexte** : heuristique simple = CommandLine PowerShell anormalement longue → Base64/obfuscation.
 **Source de logs requise** : Sysmon EID 1 ou 4688
@@ -722,6 +801,8 @@ Image="*\\powershell.exe" OR Image="*\\powershell_ise.exe"
 
 ## 3.8 WMI execution (Sysmon 19/20/21)
 
+**MITRE ATT&CK** : T1047
+
 Pattern type :
 
 ```spl
@@ -732,6 +813,8 @@ index=main source="XmlWinEventLog:Microsoft-Windows-Sysmon/Operational" EventCod
 ---
 
 ## 3.9 Scheduled task creation
+
+**MITRE ATT&CK** : T1053.005
 
 Pattern type :
 
@@ -747,6 +830,8 @@ index=main source="WinEventLog:Security" EventCode IN (4698,4700,4701,4702)
 
 ## 4.1 Service installation (7045)
 
+**MITRE ATT&CK** : T1543.003
+
 Pattern type :
 
 ```spl
@@ -758,6 +843,8 @@ index=main source="WinEventLog:System" EventCode=7045
 ---
 
 ## 4.2 Création/modification de service distant (DCE/RPC svcctl)
+
+**MITRE ATT&CK** : T1543.003
 
 **Contexte** : SharpNoPSExec / Cobalt Strike créent ou modifient des services distants via RPC svcctl.
 **Source de logs requise** : Zeek DCE/RPC
@@ -773,6 +860,8 @@ operation IN ("CreateServiceW", "CreateServiceA", "StartServiceW", "StartService
 
 ## 4.3 Registry Run keys (Sysmon EID 13)
 
+**MITRE ATT&CK** : T1547.001
+
 ```spl
 index=main source="XmlWinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=13
 TargetObject IN ("*\\Software\\Microsoft\\Windows\\CurrentVersion\\Run\\*",
@@ -787,6 +876,8 @@ TargetObject IN ("*\\Software\\Microsoft\\Windows\\CurrentVersion\\Run\\*",
 
 ## 5.1 Connexions Sysmon EID 3 - vue globale
 
+**MITRE ATT&CK** : T1071
+
 Pattern type :
 
 ```spl
@@ -799,6 +890,8 @@ NOT (DestinationIp="10.0.0.0/8" OR DestinationIp="172.16.0.0/12" OR DestinationI
 ---
 
 ## 5.2 Beaconing C2 - détection par régularité des intervalles (Zeek HTTP)
+
+**MITRE ATT&CK** : T1071.001
 
 **Contexte** : pour chaque triplet src/dest/dest_port, calculer l'intervalle entre paquets, comparer à la moyenne, garder les flux dont >90% des intervalles sont dans ±10% de la moyenne.
 **Source de logs requise** : Zeek HTTP
@@ -825,6 +918,8 @@ index="cobaltstrike_beacon" sourcetype="bro:http:json"
 
 ## 5.3 Beaconing - quick check visuel
 
+**MITRE ATT&CK** : T1071.001
+
 **Contexte** : pour valider rapidement un pattern de beaconing identifié.
 **Source de logs requise** : Zeek HTTP
 **Index typique** : `cobaltstrike_beacon`
@@ -837,6 +932,8 @@ index="cobaltstrike_beacon" sourcetype="bro:http:json" id.orig_h="<src>" id.resp
 ---
 
 ## 5.4 Nmap port scanning (Zeek conn)
+
+**MITRE ATT&CK** : T1046
 
 **Contexte** : `orig_bytes=0` + plusieurs ports différents vers même cible interne.
 **Source de logs requise** : Zeek conn
@@ -852,6 +949,8 @@ index="cobaltstrike_beacon" sourcetype="bro:conn:json" orig_bytes=0 dest_ip IN (
 ---
 
 ## 5.5 DNS queries (Sysmon EID 22) - Responder / LLMNR poisoning
+
+**MITRE ATT&CK** : T1557.001
 
 **Contexte** : un nom DNS inexistant qui résout = Responder actif sur le LAN.
 **Source de logs requise** : Sysmon
@@ -875,6 +974,8 @@ index=main SourceName=LLMNRDetection
 
 ## 5.6 Long-lived connections
 
+**MITRE ATT&CK** : T1071
+
 Pattern type :
 
 ```spl
@@ -887,6 +988,8 @@ index=main sourcetype="bro:conn:json"
 ---
 
 ## 5.7 Enrichissement Sysmon - relier connexion (EID 3) à process (EID 1)
+
+**MITRE ATT&CK** : T1071
 
 **Contexte** : pattern réutilisable pour enrichir n'importe quelle requête réseau Sysmon avec la commandline du process via `process_id`.
 **Source de logs requise** : Sysmon
@@ -907,6 +1010,8 @@ index=main source="XmlWinEventLog:Microsoft-Windows-Sysmon/Operational" (EventCo
 
 ## 6.1 PSExec / Cobalt Strike - push binaire via SMB ADMIN$
 
+**MITRE ATT&CK** : T1021.002, T1570
+
 **Contexte** : SharpHound, PSExec, Cobalt Strike déposent un binaire sur `\\C$` ou `\\ADMIN$`.
 **Source de logs requise** : Zeek SMB Files
 **Index typique** : `cobalt_strike_psexec`
@@ -922,6 +1027,8 @@ size>0
 ---
 
 ## 6.3 RDP - détection (LogonType 10)
+
+**MITRE ATT&CK** : T1021.001
 
 Pattern SPL équivalent :
 
@@ -942,6 +1049,8 @@ index=main source="WinEventLog:Security" EventCode=4624 Logon_Type=10 user=svc-*
 
 ## 6.4 SMB - accès partages (4624 LogonType 3)
 
+**MITRE ATT&CK** : T1021.002
+
 ```spl
 index=main source="WinEventLog:Security" EventCode=4624 Logon_Type=3
 user!=*$ NOT (Source_Network_Address="-" OR Source_Network_Address="::1")
@@ -955,6 +1064,8 @@ user!=*$ NOT (Source_Network_Address="-" OR Source_Network_Address="::1")
 
 ## 7.1 Event log clearing (1102)
 
+**MITRE ATT&CK** : T1070.001
+
 ```spl
 index=main source="WinEventLog:Security" EventCode=1102
 | table _time, host, SubjectUserName, SubjectLogonId
@@ -963,6 +1074,8 @@ index=main source="WinEventLog:Security" EventCode=1102
 ---
 
 ## 7.3 Process injection - détection avancée (CallTrace UNKNOWN)
+
+**MITRE ATT&CK** : T1055
 
 **Contexte** : CallTrace contenant `UNKNOWN` = appel depuis mémoire allouée (shellcode/reflective DLL). Filtrer les faux positifs .NET.
 **Source de logs requise** : Sysmon EID 10
@@ -982,6 +1095,8 @@ index="main" CallTrace="*UNKNOWN*"
 ---
 
 ## 7.4 LSASS access (Sysmon EID 10) - credential dumping
+
+**MITRE ATT&CK** : T1003.001
 
 **Contexte** : tout process accédant à `lsass.exe` est suspect. Filtrer Defender.
 **Source de logs requise** : Sysmon
@@ -1005,6 +1120,8 @@ SourceImage!="*\\MsMpEng.exe"
 
 ## 7.5 Image Load anomalies (Sysmon EID 7)
 
+**MITRE ATT&CK** : T1574
+
 - DLL non signée (`Signed=false`) chargée depuis chemin atypique
 - `clr.dll`/`clrjit.dll` chargé par `spoolsv.exe`/`lsass.exe` (BYOL .NET)
 Pattern type :
@@ -1022,6 +1139,8 @@ Image IN ("*\\spoolsv.exe","*\\lsass.exe","*\\winlogon.exe","*\\services.exe")
 
 ## 8.5 SAM hive access
 
+**MITRE ATT&CK** : T1003.002
+
 Pattern type (Sysmon EID 11 / 13 sur SAM) :
 
 ```spl
@@ -1036,6 +1155,8 @@ index=main source="XmlWinEventLog:Microsoft-Windows-Sysmon/Operational"
 # 9. Data Exfiltration
 
 ## 9.1 Exfiltration HTTP - volume POST sortant
+
+**MITRE ATT&CK** : T1041
 
 **Contexte** : agréger le volume POST par triplet src/dest/port - volume anormal = exfil.
 **Source de logs requise** : Zeek HTTP
@@ -1052,6 +1173,8 @@ index="cobaltstrike_exfiltration_http" sourcetype="bro:http:json" method=POST
 ---
 
 ## 9.2 Exfiltration DNS - sous-domaines anormalement longs
+
+**MITRE ATT&CK** : T1048.003
 
 **Contexte** : DNS tunneling = champ TXT / sous-domaines très longs depuis un même hôte.
 **Source de logs requise** : Zeek DNS
@@ -1074,6 +1197,8 @@ index=dns_exf sourcetype="bro:dns:json"
 
 ## 9.3 Ransomware (SMB) - Sodinokibi (overwrite : FILE_OPEN + FILE_RENAME en masse)
 
+**MITRE ATT&CK** : T1486
+
 **Contexte** : signature de chiffrement de masse - beaucoup d'opérations FILE_OPEN suivies de FILE_RENAME.
 **Source de logs requise** : Zeek SMB Files
 **Index typique** : `ransomware_open_rename_sodinokibi`
@@ -1091,6 +1216,8 @@ index="ransomware_open_rename_sodinokibi" sourcetype="bro:smb_files:json"
 ---
 
 ## 9.4 Ransomware (SMB) - CTBLocker (renaming en masse vers une nouvelle extension)
+
+**MITRE ATT&CK** : T1486
 
 **Source de logs requise** : Zeek SMB Files
 **Index typique** : `ransomware_new_file_extension_ctbl_ocker`
@@ -1160,6 +1287,8 @@ index=main <filtre>
 ---
 
 ## 10.6 Transactions process create + connexion réseau rapides
+
+**MITRE ATT&CK** : T1071
 
 **Contexte** : signal C2 / loader - process créé → connexion sortante immédiate.
 **Source de logs requise** : Sysmon
